@@ -4,15 +4,10 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-import io.reactivex.Completable;
-import io.reactivex.CompletableObserver;
-import io.reactivex.CompletableSource;
 import okhttp3.Headers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -23,17 +18,15 @@ import okio.ByteString;
 
 class OkHttpConnectionProvider extends AbstractConnectionProvider {
 
+    public static final String TAG = "OkHttpConnProvider";
+
     private final String mUri;
     @NonNull
     private final Map<String, String> mConnectHttpHeaders;
     private final OkHttpClient mOkHttpClient;
-    private final String tag = OkHttpConnectionProvider.class.getSimpleName();
 
     @Nullable
     private WebSocket openSocket;
-
-    @Nullable
-    private CompletableWebSocketListener socketListener;
 
     OkHttpConnectionProvider(String uri, @Nullable Map<String, String> connectHttpHeaders, OkHttpClient okHttpClient) {
         super();
@@ -46,8 +39,6 @@ class OkHttpConnectionProvider extends AbstractConnectionProvider {
     public void rawDisconnect() {
         if (openSocket != null) {
             openSocket.close(1000, "");
-            if (socketListener != null)
-                socketListener.awaitCloseBlocking();
         }
     }
 
@@ -58,10 +49,52 @@ class OkHttpConnectionProvider extends AbstractConnectionProvider {
 
         addConnectionHeadersToBuilder(requestBuilder, mConnectHttpHeaders);
 
-        socketListener = new CompletableWebSocketListener();
+        openSocket = mOkHttpClient.newWebSocket(requestBuilder.build(),
+                new WebSocketListener() {
+                    @Override
+                    public void onOpen(WebSocket webSocket, @NonNull Response response) {
+                        LifecycleEvent openEvent = new LifecycleEvent(LifecycleEvent.Type.OPENED);
 
-        openSocket = mOkHttpClient
-                .newWebSocket(requestBuilder.build(), socketListener);
+                        TreeMap<String, String> headersAsMap = headersAsMap(response);
+
+                        openEvent.setHandshakeResponseHeaders(headersAsMap);
+                        emitLifecycleEvent(openEvent);
+                    }
+
+                    @Override
+                    public void onMessage(WebSocket webSocket, String text) {
+                        if (text.equals("\n"))
+                            Log.d(TAG, "RECEIVED HEARTBEAT");
+                        else
+                            emitMessage(text);
+                    }
+
+                    @Override
+                    public void onMessage(WebSocket webSocket, @NonNull ByteString bytes) {
+                        emitMessage(bytes.utf8());
+                    }
+
+                    @Override
+                    public void onClosed(WebSocket webSocket, int code, String reason) {
+                        openSocket = null;
+                        emitLifecycleEvent(new LifecycleEvent(LifecycleEvent.Type.CLOSED));
+                    }
+
+                    @Override
+                    public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+                        // in OkHttp, a Failure is equivalent to a JWS-Error *and* a JWS-Close
+                        emitLifecycleEvent(new LifecycleEvent(LifecycleEvent.Type.ERROR, new Exception(t)));
+                        openSocket = null;
+                        emitLifecycleEvent(new LifecycleEvent(LifecycleEvent.Type.CLOSED));
+                    }
+
+                    @Override
+                    public void onClosing(final WebSocket webSocket, final int code, final String reason) {
+                        webSocket.close(code, reason);
+                    }
+                }
+
+        );
     }
 
     @Override
@@ -88,77 +121,6 @@ class OkHttpConnectionProvider extends AbstractConnectionProvider {
     private void addConnectionHeadersToBuilder(@NonNull Request.Builder requestBuilder, @NonNull Map<String, String> mConnectHttpHeaders) {
         for (Map.Entry<String, String> headerEntry : mConnectHttpHeaders.entrySet()) {
             requestBuilder.addHeader(headerEntry.getKey(), headerEntry.getValue());
-        }
-    }
-
-    // Class for a WS Listener that completes after the socket closes
-    private class CompletableWebSocketListener extends WebSocketListener implements CompletableSource {
-        private List<CompletableObserver> mObservers = new ArrayList<>();
-        private Completable mCompletable = Completable.wrap(this);
-
-        @Override
-        public void onOpen(WebSocket webSocket, @NonNull Response response) {
-            LifecycleEvent openEvent = new LifecycleEvent(LifecycleEvent.Type.OPENED);
-
-            TreeMap<String, String> headersAsMap = headersAsMap(response);
-
-            openEvent.setHandshakeResponseHeaders(headersAsMap);
-            emitLifecycleEvent(openEvent);
-        }
-
-        @Override
-        public void onMessage(WebSocket webSocket, String text) {
-            if (text.equals("\n"))
-                Log.d(tag, "RECEIVED HEARTBEAT");
-            else
-                emitMessage(text);
-        }
-
-        @Override
-        public void onMessage(WebSocket webSocket, @NonNull ByteString bytes) {
-            emitMessage(bytes.utf8());
-        }
-
-        @Override
-        public void onClosed(WebSocket webSocket, int code, String reason) {
-            openSocket = null;
-            emitLifecycleEvent(new LifecycleEvent(LifecycleEvent.Type.CLOSED));
-            launchCloseEvent();
-        }
-
-        @Override
-        public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-            // in OkHttp, a Failure is equivalent to a JWS-Error *and* a JWS-Close
-            emitLifecycleEvent(new LifecycleEvent(LifecycleEvent.Type.ERROR, new Exception(t)));
-            openSocket = null;
-            emitLifecycleEvent(new LifecycleEvent(LifecycleEvent.Type.CLOSED));
-            launchErrorEvent(t);
-        }
-
-        @Override
-        public void onClosing(final WebSocket webSocket, final int code, final String reason) {
-            webSocket.close(code, reason);
-        }
-
-        @Override
-        public void subscribe (CompletableObserver observer) {
-            mObservers.add(observer);
-        }
-
-        private void awaitCloseBlocking(){
-            mCompletable.blockingAwait();
-        }
-
-        private void launchCloseEvent(){
-            for (CompletableObserver observer : mObservers) {
-                observer.onComplete();
-            }
-        }
-
-        private void launchErrorEvent(Throwable t){
-            for (CompletableObserver observer : mObservers) {
-                    observer.onError(t);
-            }
         }
     }
 }
