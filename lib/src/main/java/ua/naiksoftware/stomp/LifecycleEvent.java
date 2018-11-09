@@ -20,6 +20,9 @@ public class LifecycleEvent {
     //Nullable
     private String mMessage;
 
+    //Nullable
+    private Integer mCloseCode;
+
     private TreeMap<String, String> handshakeResponseHeaders = new TreeMap<>();
 
     public LifecycleEvent(Type type) {
@@ -36,6 +39,11 @@ public class LifecycleEvent {
         mMessage = message;
     }
 
+    public LifecycleEvent(Type type, Integer closeCode) {
+        mType = type;
+        mCloseCode = closeCode;
+    }
+
     public Type getType() {
         return mType;
     }
@@ -46,6 +54,10 @@ public class LifecycleEvent {
 
     public String getMessage() {
         return mMessage;
+    }
+
+    public Integer getmCloseCode() {
+        return mCloseCode;
     }
 
     public void setHandshakeResponseHeaders(TreeMap<String, String> handshakeResponseHeaders) {

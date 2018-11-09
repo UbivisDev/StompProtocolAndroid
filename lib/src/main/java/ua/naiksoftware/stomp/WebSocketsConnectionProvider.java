@@ -92,7 +92,7 @@ class WebSocketsConnectionProvider extends AbstractConnectionProvider {
             public void onClose(int code, String reason, boolean remote) {
                 Log.d(TAG, "onClose: code=" + code + " reason=" + reason + " remote=" + remote);
                 haveConnection = false;
-                emitLifecycleEvent(new LifecycleEvent(LifecycleEvent.Type.CLOSED));
+                emitLifecycleEvent(new LifecycleEvent(LifecycleEvent.Type.CLOSED, code));
             }
 
             @Override
