@@ -1,6 +1,6 @@
 # STOMP protocol via WebSocket for Android
 
-[![Release](https://jitpack.io/v/NaikSoftware/StompProtocolAndroid.svg)](https://jitpack.io/#NaikSoftware/StompProtocolAndroid)
+[![Release](https://jitpack.io/v/UbivisDev/StompProtocolAndroid.svg)](https://jitpack.io/#UbivisDev/StompProtocolAndroid)
 
 ## Overview
 
