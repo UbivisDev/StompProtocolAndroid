@@ -56,7 +56,7 @@ public class LifecycleEvent {
         return mMessage;
     }
 
-    public Integer getmCloseCode() {
+    public Integer getCloseCode() {
         return mCloseCode;
     }
 
