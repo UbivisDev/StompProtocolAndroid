@@ -4,10 +4,18 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
+import org.java_websocket.framing.CloseFrame;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeoutException;
 
+import io.reactivex.CompletableEmitter;
+import io.reactivex.CompletableObserver;
+import io.reactivex.CompletableSource;
 import okhttp3.Headers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -28,6 +36,9 @@ class OkHttpConnectionProvider extends AbstractConnectionProvider {
     @Nullable
     private WebSocket openSocket;
 
+    @Nullable
+    private CountDownLatch latch;
+
     OkHttpConnectionProvider(String uri, @Nullable Map<String, String> connectHttpHeaders, OkHttpClient okHttpClient) {
         super();
         mUri = uri;
@@ -38,7 +49,14 @@ class OkHttpConnectionProvider extends AbstractConnectionProvider {
     @Override
     public void rawDisconnect() {
         if (openSocket != null) {
-            openSocket.close(1000, "");
+            openSocket.close(CloseFrame.ABNORMAL_CLOSE, "");
+            try {
+                if (latch != null)
+                    latch.await();
+            } catch(InterruptedException e){
+                Log.e(TAG, "Thread interrupted while waiting for Websocket closing: ", e);
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -49,6 +67,8 @@ class OkHttpConnectionProvider extends AbstractConnectionProvider {
 
         addConnectionHeadersToBuilder(requestBuilder, mConnectHttpHeaders);
 
+        final CountDownLatch l = new CountDownLatch(1);
+        latch = l;
         openSocket = mOkHttpClient.newWebSocket(requestBuilder.build(),
                 new WebSocketListener() {
                     @Override
@@ -77,7 +97,9 @@ class OkHttpConnectionProvider extends AbstractConnectionProvider {
                     @Override
                     public void onClosed(WebSocket webSocket, int code, String reason) {
                         openSocket = null;
+                        latch = null;
                         emitLifecycleEvent(new LifecycleEvent(LifecycleEvent.Type.CLOSED));
+                        l.countDown();
                     }
 
                     @Override
@@ -93,7 +115,6 @@ class OkHttpConnectionProvider extends AbstractConnectionProvider {
                         webSocket.close(code, reason);
                     }
                 }
-
         );
     }
 
