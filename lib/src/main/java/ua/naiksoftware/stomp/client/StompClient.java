@@ -115,6 +115,7 @@ public class StompClient {
                         case OPENED:
                             List<StompHeader> headers = new ArrayList<>();
                             headers.add(new StompHeader(StompHeader.VERSION, SUPPORTED_VERSIONS));
+                            headers.add(new StompHeader(StompHeader.HOST, mConnectionProvider.getHost()));
                             headers.add(new StompHeader(StompHeader.HEART_BEAT, "0," + heartbeat));
                             if (_headers != null) headers.addAll(_headers);
                             mConnectionProvider.send(new StompMessage(StompCommand.CONNECT, headers, null).compile(legacyWhitespace))

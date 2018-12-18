@@ -10,6 +10,13 @@ import io.reactivex.Observable;
 public interface ConnectionProvider {
 
     /**
+     * Beginning with STOMP 1.1, the CONNECT frame requires the 'host' header, this method
+     * provides an easy access to the host of the provider
+     * @return the host of the provider connection
+     */
+    String getHost();
+
+    /**
      * Subscribe this for receive stomp messages
      */
     Observable<String> messages();
