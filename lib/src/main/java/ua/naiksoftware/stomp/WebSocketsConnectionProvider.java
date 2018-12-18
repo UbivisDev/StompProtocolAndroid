@@ -123,6 +123,14 @@ class WebSocketsConnectionProvider extends AbstractConnectionProvider {
     }
 
     @Override
+    public String getHost() {
+        if(mWebSocketClient != null)
+            return mWebSocketClient.getURI().getHost();
+        else
+            return null;
+    }
+
+    @Override
     Object getSocket() {
         return mWebSocketClient;
     }

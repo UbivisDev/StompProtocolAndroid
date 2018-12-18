@@ -10,12 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeoutException;
 
-import io.reactivex.CompletableEmitter;
-import io.reactivex.CompletableObserver;
-import io.reactivex.CompletableSource;
 import okhttp3.Headers;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -127,6 +122,14 @@ class OkHttpConnectionProvider extends AbstractConnectionProvider {
     @Override
     Object getSocket() {
         return openSocket;
+    }
+
+    @Override
+    public String getHost() {
+        if(openSocket != null)
+            return openSocket.request().url().host();
+        else
+            return null;
     }
 
     @NonNull
